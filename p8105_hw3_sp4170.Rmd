@@ -36,4 +36,29 @@ brfss_smart2010 |>
   )
 ```
 
+## answer questions
+
+### Question 1
+
+In 2002, which states were observed at 7 or more locations? What about in 2010?
+
+```{r}
+brfss_df |> 
+  filter(year == 2002) |> 
+  group_by(locationabbr) |> 
+  summarise(n_locations = n_distinct(locationdesc)) |> 
+  filter(n_locations >= 7)
+```
+
+* in 2002, states **CT, FL, MA, NC, NJ, and PA** were observed at 7 or more locations.
+
+```{r}
+brfss_df |> 
+  filter(year == 2010) |> 
+  group_by(locationabbr) |> 
+  summarise(n_locations = n_distinct(locationdesc)) |> 
+  filter(n_locations >= 7)
+```
+
+* in 2010, states **CA, CO, FL, MA, MD, NC, NE, NJ, NY, OH, PA, SC, TX, and WA** were observed at 7 or more locations.
 
