@@ -95,3 +95,21 @@ brfss_excellent_df |>
 
 * here, i first create a dataset `brfss_excellent_df` following the requirement. This new dataset only have 3 variables, which are year, locationabbr, and mean_data_value and is limited to Excellent responses. Then i do a spaghetti plot using geom_line() to show average data value over time within states.
 
+### Question 3
+
+Make a two-panel plot showing, for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State.
+
+```{r}
+brfss_df |> 
+  filter(
+    locationabbr == 'NY',
+    year == 2006 | year == 2010) |> 
+  group_by(locationdesc) |> 
+  ggplot(aes(x = data_value, fill = response)) +
+  geom_density(alpha = 0.3) +
+  facet_grid(. ~ year)+
+  labs(
+    title = "Distribution of data value for response among NY locations"
+  )
+```
+
