@@ -17,12 +17,15 @@ library(p8105.datasets)
 data("brfss_smart2010")
 ```
 
+## data cleaning
+
 * First, do some data cleaning:
   * format the data to use appropriate variable names using `janitor::clean_names()`;
   * focus on the “Overall Health” topic using `filter()`
   * include only responses from “Excellent” to “Poor” also using `filter()`
   * organize responses as a factor taking levels ordered from “Poor” to “Excellent” using `mutate()` and `fct_relevel()`.
 ```{r}
+brfss_df =
 brfss_smart2010 |> 
   janitor::clean_names() |> 
   filter(
@@ -32,4 +35,5 @@ brfss_smart2010 |>
     response = fct_relevel(response, c('Poor', 'Fair', 'Good', 'Very good', 'Excellent'))
   )
 ```
+
 
