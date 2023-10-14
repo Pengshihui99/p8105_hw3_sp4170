@@ -4,18 +4,25 @@ author: "Shihui Peng"
 date: "2023-10-14"
 output: github_document
 ---
+load libraries and packages that will be used. Then, set options using code provided by Jeff in the lecture.
 ```{r, echo=FALSE, message=FALSE}
 library(tidyverse)
+library(p8105.datasets)
+data("brfss_smart2010")
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
 ```
 
 
 # Problem 2
-
-Load the data from the p8105.datasets package.
-```{r}
-library(p8105.datasets)
-data("brfss_smart2010")
-```
 
 ## data cleaning
 
@@ -111,5 +118,37 @@ brfss_df |>
   labs(
     title = "Distribution of data value for response among NY locations"
   )
+```
+
+* here, i first filter the dataset and then do a density plot and use `facet_grid()` to make it as a 2-panel plot.
+
+
+# Problem 3
+
+## data loading, tidying, and merging and organizing
+
+Load, tidy, merge, and otherwise organize the data sets. 
+* include all originally observed variables
+* exclude participants less than 21 years of age, and those with missing demographic data
+* and encode data with reasonable variable classes (i.e. not numeric, and using factors with the ordering of tables and plots in mind).
+
+```{r}
+accel_df = 
+  read_csv("data/nhanes_accel.csv") |> 
+  janitor::clean_names()
+
+covar_df =
+  read_csv("data/nhanes_covar.csv", skip = 4) |> 
+  janitor::clean_names()
+
+final_df =
+  left_join(covar_df, accel_df, by = 'seqn') |> 
+  drop_na(sex, age, bmi, education) |> 
+  filter(age >= 21) |> 
+  mutate(
+    education = as.factor(education),
+    sex = case_match(sex, 1 ~ 'male', 2 ~ 'female')
+  )
+
 ```
 
