@@ -41,7 +41,8 @@ brfss_smart2010 |>
     response == 'Excellent' | response == 'Very good' | response =='Good' | response == 'Fair' | response == 'Poor') |> 
   mutate(
     response = fct_relevel(response, c('Poor', 'Fair', 'Good', 'Very good', 'Excellent'))
-  )
+  ) |> 
+  rename(state = locationabbr, state_location = locationdesc)
 ```
 
 i named the cleaned dataset as 'brfss_df'.
@@ -56,23 +57,23 @@ In 2002, which states were observed at 7 or more locations? What about in 2010?
 brfss_2002_df =
 brfss_df |> 
   filter(year == 2002) |> 
-  group_by(locationabbr) |> 
-  summarise(n_locations = n_distinct(locationdesc)) |> 
+  group_by(state) |> 
+  summarise(n_locations = n_distinct(state_location)) |> 
   filter(n_locations >= 7)
 ```
 
-* in 2002, states **`r pull(brfss_2002_df, locationabbr)`** were observed at 7 or more locations.
+* in 2002, states **`r pull(brfss_2002_df, state)`** were observed at 7 or more locations.
 
 ```{r}
 brfss_2010_df =
 brfss_df |> 
   filter(year == 2010) |> 
-  group_by(locationabbr) |> 
-  summarise(n_locations = n_distinct(locationdesc)) |> 
+  group_by(state) |> 
+  summarise(n_locations = n_distinct(state_location)) |> 
   filter(n_locations >= 7)
 ```
 
-* in 2010, states **`r pull(brfss_2010_df, locationabbr)`** were observed at 7 or more locations.
+* in 2010, states **`r pull(brfss_2010_df, state)`** were observed at 7 or more locations.
 
 ### Question 2
 
@@ -85,22 +86,23 @@ requirement:
 brfss_excellent_df =
 brfss_df |> 
   filter(response == 'Excellent') |> 
-  group_by(locationabbr) |> 
+  group_by(state, year) |> 
   mutate(
     mean_data_value = mean(data_value, na.rm = TRUE)
   ) |> 
-  select(year, locationabbr, mean_data_value) |> 
-  distinct()
+  select(year, state, mean_data_value) |> 
+  distinct(state, .keep_all = TRUE)
 
 brfss_excellent_df |> 
   ggplot(aes(x = year, y = mean_data_value)) +
-  geom_line(aes(group = locationabbr, color = locationabbr)) +
+  geom_line(aes(group = state, color = state)) +
   labs(
     title = "Average data value over time within states"
-  )
+  ) +
+  theme(legend.position = "right")
 ```
 
-* here, i first create a dataset `brfss_excellent_df` following the requirement. This new dataset only have 3 variables, which are year, locationabbr, and mean_data_value and is limited to Excellent responses. Then i do a spaghetti plot using geom_line() to show average data value over time within states.
+* here, i first create a dataset `brfss_excellent_df` following the requirement. This new dataset only have 3 variables, which are year, state, and mean_data_value and is limited to Excellent responses. Then i do a spaghetti plot using geom_line() to show average data value over time within states.
 
 ### Question 3
 
@@ -109,9 +111,9 @@ Make a two-panel plot showing, for the years 2006, and 2010, distribution of dat
 ```{r}
 brfss_df |> 
   filter(
-    locationabbr == 'NY',
+    state == 'NY',
     year == 2006 | year == 2010) |> 
-  group_by(locationdesc) |> 
+  group_by(state_location) |> 
   ggplot(aes(x = data_value, fill = response)) +
   geom_density(alpha = 0.3) +
   facet_grid(. ~ year)+
@@ -134,16 +136,20 @@ Load, tidy, merge, and otherwise organize the data sets.
 
 ```{r}
 accel_df = 
-  read_csv("data/nhanes_accel.csv") |> 
+  read_csv("data/nhanes_accel.csv", na = '.') |> 
   janitor::clean_names() |> 
   pivot_longer(
     min1:min1440,
     names_to = 'time',
-    values_to = 'mims'
+    values_to = 'mims',
+    names_prefix = 'min'
+  ) |> 
+  mutate(
+    time = as.factor(time)
   )
 
 covar_df =
-  read_csv("data/nhanes_covar.csv", skip = 4) |> 
+  read_csv("data/nhanes_covar.csv", skip = 4, na = '.') |> 
   janitor::clean_names()
 
 final_df =
@@ -151,7 +157,7 @@ final_df =
   drop_na(sex, age, bmi, education) |> 
   filter(age >= 21) |> 
   mutate(
-    education = case_match(education, 1 ~ 'less_than_high_school', 2 ~ 'high_school_equivalent', 3 ~ 'more_than_high_school'),
+    education = ifelse(education == 1, 'less_than_high_school', ifelse(education == 2, 'high_school_equivalent', 'more_than_high_school')),
     sex = case_match(sex, 1 ~ 'male', 2 ~ 'female'),
     education = fct_relevel(education, c('less_than_high_school', 'high_school_equivalent', 'more_than_high_school'))
   )
@@ -166,23 +172,29 @@ final_df =
 
 ```{r}
 final_df |> 
-  select(sex, education, age) |> 
+  select(seqn, sex, education, age) |> 
+  distinct(seqn, .keep_all = TRUE) |> 
   group_by(sex, education) |> 
   summarise(n_obs = n()) |>
-  knitr::kable()
+  pivot_wider(
+    names_from = 'sex',
+    values_from = 'n_obs'
+  )
 
 final_df |> 
-  select(sex, education, age) |> 
+  select(seqn, sex, education, age) |> 
+  distinct(seqn, .keep_all = TRUE) |> 
   ggplot(aes(x = age, color = sex))+
   geom_histogram(binwidth = 5, alpha = 0.3) +
   facet_grid(. ~ education) +
   labs(
-    title = 'Age distributions by sex and education category'
+    title = 'Age distributions by sex and education category',
+    y = 'Frequency'
   )
 ```
 
 * 1st part code
-  * here, i group the dataset by sex and education category using `group_by()` and then use `summarise()` to count how many observations in each single group (name this variable as n_obs). Then i use `knitr::kable()` to produce a reader-friendly table.
+  * here, i group the dataset by sex and education category using `group_by()` and then use `summarise()` to count how many observations in each single group (name this variable as n_obs). Then i use `pivot_wider()` to produce a reader-friendly table.
   * *comments*: 
     * In both sex groups, most participants are educated more than high school, while more females get education more than high school than males.
     * Among females, least participants are educated as high school equivalent.
@@ -207,25 +219,48 @@ final_df |>
   group_by(seqn) |> 
   mutate(sum_activity = sum(mims)) |> 
   select(seqn, sex, age, education, sum_activity) |> 
-  distinct() |> 
+  distinct(seqn, .keep_all = TRUE) |> 
   ggplot(aes(x = age, y = sum_activity, color = sex)) +
-  geom_smooth() +
+  geom_smooth(se = FALSE) +
   facet_grid(. ~ education) +
   labs(
-    title = 'Total activity over the day by sex and education'
+    title = 'Total activity over the day by sex and education',
+    y = 'total activity over a day'
   )
 ```
 
 I include a smooth in my plot.
 
 * *comments*:
-  * for each education group, the sum_activity would decrease when ages increase for both genders.
+  * for each education group, the sum_activity would approximately decrease when ages increase for both genders. but for high school equivalent group, sum_activity would first increased apparently until age arrived around 40 yrs, then it will go down. For more than high school group, sum_activity will fluctuate until age arrived around 55 yrs and then it will go down.
   * for education group that is high school equivalent and more than high school, in most age, the sum_activity for females surpass males.
   * for education group that is less than high school, before around 40 years old, females have sum_activity greater than males. after around 40 years old, the situation reverses.
-  * based on the plots, the group of less than high school education and the group of high school equivalent education have wider variations than the group of more than high school education.
   
+### Question 3
 
+Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
 
+```{r}
+final_df |>
+  select(sex, education, time, mims) |> 
+  group_by(time, sex, education) |> 
+  mutate(
+    sum_activity_sex_edu = sum(mims),
+    time = as.numeric(time),
+    mean_activity_sex_edu = mean(mims)
+  ) |> 
+  ggplot(aes(x = time, y = mean_activity_sex_edu, color = sex)) +
+
+  geom_smooth() +
+  scale_x_continuous(
+    breaks = c(0, 500, 1000, 1500),
+    ) +
+  facet_grid(. ~ education)
+```
+
+* *comment*:
+  * for both sex, the mean activity will decrease from the start of a day until time goes to around 600 mins of a day. Then the mean activity will increase until time goes to around 1000 mins of a day. Then the mean activity will decrease till the end of day.
+  * for each education level, the lowest mean activity of a day is similar, while for the highest mean activity of a day, group less than high school will have more mean activity than other two groups.
 
 
 
