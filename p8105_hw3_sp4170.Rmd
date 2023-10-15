@@ -7,8 +7,9 @@ output: github_document
 load libraries and packages that will be used. Then, set options using code provided by Jeff in the lecture.
 ```{r, echo=FALSE, message=FALSE}
 library(tidyverse)
+library(ggridges)
+library(patchwork)
 library(p8105.datasets)
-data("brfss_smart2010")
 
 theme_set(theme_minimal() + theme(legend.position = "bottom"))
 
@@ -21,8 +22,78 @@ scale_colour_discrete = scale_colour_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
 ```
 
+# Problem 1
+
+#### Read in the data
+
+```{r}
+data("instacart")
+
+instacart = 
+  instacart |> 
+  as_tibble()
+```
+
+#### Answer questions about the data
+
+This dataset contains `r nrow(instacart)` rows and `r ncol(instacart)` columns, with each row resprenting a single product from an instacart order. Variables include identifiers for user, order, and product; the order in which each product was added to the cart. There are several order-level variables, describing the day and time of the order, and number of days since prior order. Then there are several item-specific variables, describing the product name (e.g. Yogurt, Avocado), department (e.g. dairy and eggs, produce), and aisle (e.g. yogurt, fresh fruits), and whether the item has been ordered by this user in the past. In total, there are `r instacart |> select(product_id) |> distinct() |> count()` products found in `r instacart |> select(user_id, order_id) |> distinct() |> count()` orders from `r instacart |> select(user_id) |> distinct() |> count()` distinct users.
+
+Below is a table summarizing the number of items ordered from aisle. In total, there are 134 aisles, with fresh vegetables and fresh fruits holding the most items ordered by far.
+
+```{r}
+instacart |> 
+  count(aisle) |> 
+  arrange(desc(n))
+```
+
+Next is a plot that shows the number of items ordered in each aisle. Here, aisles are ordered by ascending number of items.
+
+```{r}
+instacart |> 
+  count(aisle) |> 
+  filter(n > 10000) |> 
+  mutate(aisle = fct_reorder(aisle, n)) |> 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+
+Our next table shows the three most popular items in aisles `baking ingredients`, `dog food care`, and `packaged vegetables fruits`, and includes the number of times each item is ordered in your table.
+
+```{r}
+instacart |> 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) |>
+  group_by(aisle) |> 
+  count(product_name) |> 
+  mutate(rank = min_rank(desc(n))) |> 
+  filter(rank < 4) |> 
+  arrange(desc(n)) |>
+  knitr::kable()
+```
+
+Finally is a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week. This table has been formatted in an untidy manner for human readers. Pink Lady Apples are generally purchased slightly earlier in the day than Coffee Ice Cream, with the exception of day 5.
+
+```{r}
+instacart |>
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) |>
+  group_by(product_name, order_dow) |>
+  summarize(mean_hour = mean(order_hour_of_day)) |>
+  pivot_wider(
+    names_from = order_dow, 
+    values_from = mean_hour) |>
+  knitr::kable(digits = 2)
+```
+
 
 # Problem 2
+
+### read in the data
+```{r}
+data("brfss_smart2010")
+```
+
 
 ## data cleaning
 
@@ -45,7 +116,7 @@ brfss_smart2010 |>
   rename(state = locationabbr, state_location = locationdesc)
 ```
 
-i named the cleaned dataset as 'brfss_df'.
+i named the cleaned dataset as 'brfss_df'. the cleaned dataset has `r nrow(brfss_df)` rows and `r ncol(brfss_df)` cols.
 
 ## answer questions
 
@@ -95,14 +166,17 @@ brfss_df |>
 
 brfss_excellent_df |> 
   ggplot(aes(x = year, y = mean_data_value)) +
-  geom_line(aes(group = state, color = state)) +
+  geom_line(aes(color = state), alpha = 0.5) +
   labs(
-    title = "Average data value over time within states"
+    title = "Average data value over time within states",
+    x = 'Year',
+    y = 'Mean value'
   ) +
   theme(legend.position = "right")
 ```
 
 * here, i first create a dataset `brfss_excellent_df` following the requirement. This new dataset only have 3 variables, which are year, state, and mean_data_value and is limited to Excellent responses. Then i do a spaghetti plot using geom_line() to show average data value over time within states.
+* from the plot, we can see that generally, the mean_data_values slightly decreased for states across years, even though the mean_data_value themselves fluctuate for each state. The mean values for states mainly lie between 15 and 30 across years, only 2 states have mean value lower than 15 across years.
 
 ### Question 3
 
@@ -116,6 +190,7 @@ brfss_df |>
   group_by(state_location) |> 
   ggplot(aes(x = data_value, fill = response)) +
   geom_density(alpha = 0.3) +
+  geom_boxplot(alpha = 0.5) +
   facet_grid(. ~ year)+
   labs(
     title = "Distribution of data value for response among NY locations"
@@ -123,7 +198,7 @@ brfss_df |>
 ```
 
 * here, i first filter the dataset and then do a density plot and use `facet_grid()` to make it as a 2-panel plot.
-
+* from the plot, we can find that the response variable (we switch it into factor variable, so it has an order ranking from poor to excellent, and here we treat good, vary good, and excellent as a cluster of response as good experience) increases when the data_value increase, That is, for observations with a higher data_value, the response will be higher correspondingly. And the density for response from lowest to highest is Good, Very good, excellent, Fair, and Poor in 2006 and Good, Very good, Fair, Excellent, Poor for 2010. The density of Poor in 2006 is less than that of 2010.
 
 # Problem 3
 
@@ -136,32 +211,32 @@ Load, tidy, merge, and otherwise organize the data sets.
 
 ```{r}
 accel_df = 
-  read_csv("data/nhanes_accel.csv", na = '.') |> 
+  read_csv("data/nhanes_accel.csv") |> 
   janitor::clean_names() |> 
   pivot_longer(
     min1:min1440,
     names_to = 'time',
     values_to = 'mims',
     names_prefix = 'min'
-  ) |> 
-  mutate(
-    time = as.factor(time)
   )
 
 covar_df =
-  read_csv("data/nhanes_covar.csv", skip = 4, na = '.') |> 
+  read_csv("data/nhanes_covar.csv", skip = 4) |> 
   janitor::clean_names()
 
 final_df =
   left_join(covar_df, accel_df, by = 'seqn') |> 
-  drop_na(sex, age, bmi, education) |> 
+  drop_na() |> 
   filter(age >= 21) |> 
   mutate(
     education = ifelse(education == 1, 'less_than_high_school', ifelse(education == 2, 'high_school_equivalent', 'more_than_high_school')),
-    sex = case_match(sex, 1 ~ 'male', 2 ~ 'female'),
+    sex = ifelse(sex == 1,'male', 'female'),
     education = fct_relevel(education, c('less_than_high_school', 'high_school_equivalent', 'more_than_high_school'))
   )
+
 ```
+
+* the final dataset, which is cleaned, tidied, merged, and organized, has `r nrow(final_df)` rows and `r ncol(final_df)` cols.
 
 ## Questions
 
@@ -171,6 +246,7 @@ final_df =
 * create a visualization of the age distributions for men and women in each education category. Comment on these items.
 
 ```{r}
+final_easy_read_df =
 final_df |> 
   select(seqn, sex, education, age) |> 
   distinct(seqn, .keep_all = TRUE) |> 
@@ -179,35 +255,42 @@ final_df |>
   pivot_wider(
     names_from = 'sex',
     values_from = 'n_obs'
-  )
+  ) |> 
+  knitr::kable()
+
+final_easy_read_df
+
 
 final_df |> 
   select(seqn, sex, education, age) |> 
   distinct(seqn, .keep_all = TRUE) |> 
-  ggplot(aes(x = age, color = sex))+
-  geom_histogram(binwidth = 5, alpha = 0.3) +
+  ggplot(aes(x = age, fill = sex))+
+  geom_histogram(binwidth = 5, alpha = 0.3, position = 'dodge') +
   facet_grid(. ~ education) +
   labs(
     title = 'Age distributions by sex and education category',
-    y = 'Frequency'
+    y = 'Frequency',
+    x = 'Age'
   )
 ```
 
 * 1st part code
-  * here, i group the dataset by sex and education category using `group_by()` and then use `summarise()` to count how many observations in each single group (name this variable as n_obs). Then i use `pivot_wider()` to produce a reader-friendly table.
+  * I create a new dataframe called 'final_easy_read_df'. here, i group the dataset by sex and education category using `group_by()` and then use `summarise()` to count how many observations in each single group (name this variable as n_obs). Then i use `pivot_wider()` to produce a reader-friendly table.
   * *comments*: 
-    * In both sex groups, most participants are educated more than high school, while more females get education more than high school than males.
-    * Among females, least participants are educated as high school equivalent.
-    * Among males, least participants are educated as less than high school.
-    * for group of getting less than high school education and getting more than high school education, counts of females are larger than of males.
+    * In both sex groups, most participants are educated more than high school (115 in total), while more females (59) get education more than high school than males (56).
+    * Among females, least participants are educated as high school equivalent (23).
+    * Among males, least participants are educated as less than high school (27).
+    * for group of getting less than high school education (female:male=28:27) and getting more than high school education (female:male=59:56), counts of females are larger than of males. But the distribution across sex for these 2 groups are relatively balanced.
+    * for group of high school equivalent education, counts of females are less than of males (female:male=23:35)
   
 * 2nd part code
+  * i create a histogram titled 'Age distributions by sex and education category' and treat age variable in x-axis and grouped by sex. Then i great 3 panels based on the category of education.
   * *comments*: 
     * among those with less than high school education, most females aged around 70 and most males aged around 45 and 70.
     * among those with high school equivalent education, most females aged around 80 and most males aged around 55.
     * among those with more than high school education, most females aged around 30 and most males aged around 30.
     * we can see that the age distribution of females are more skewed for those who received more than high school education, while of males are more average across age.
-    * for group of getting less than high school education and getting more than high school education, counts of females are larger than of males.
+    * for group of getting less than high school education and getting more than high school education, counts of females are larger than of males. Overall, proportion of participants with more than high school education is larger than other 2 education groups separately.
     
 ### Question 2
 
@@ -225,16 +308,18 @@ final_df |>
   facet_grid(. ~ education) +
   labs(
     title = 'Total activity over the day by sex and education',
-    y = 'total activity over a day'
+    y = 'total activity over a day',
+    x = 'Age'
   )
 ```
 
 I include a smooth in my plot.
 
 * *comments*:
-  * for each education group, the sum_activity would approximately decrease when ages increase for both genders. but for high school equivalent group, sum_activity would first increased apparently until age arrived around 40 yrs, then it will go down. For more than high school group, sum_activity will fluctuate until age arrived around 55 yrs and then it will go down.
-  * for education group that is high school equivalent and more than high school, in most age, the sum_activity for females surpass males.
-  * for education group that is less than high school, before around 40 years old, females have sum_activity greater than males. after around 40 years old, the situation reverses.
+  * for each education group, the sum_activity would generally decrease when ages increase for both genders. but for high school equivalent group, sum_activity would first increased apparently until age arrived around 40 yrs, then it will go down. For more than high school group, sum_activity will fluctuate until age arrived around 55 yrs and then it will go down. For less than high school group, sum_activity will temporarily increase between age around 47 and 60.
+  * for education group that is high school equivalent and more than high school, for most age, the sum_activity for females surpass males. 
+  * For less than high school education group, before age around 50, females' sum_activity surpass males', but after around age of 50, the situation reverse.
+  * the range of total activity over a day across age for less than high school education group is larger than the other 2 education groups.
   
 ### Question 3
 
@@ -245,25 +330,25 @@ final_df |>
   select(sex, education, time, mims) |> 
   group_by(time, sex, education) |> 
   mutate(
-    sum_activity_sex_edu = sum(mims),
     time = as.numeric(time),
     mean_activity_sex_edu = mean(mims)
   ) |> 
   ggplot(aes(x = time, y = mean_activity_sex_edu, color = sex)) +
-
-  geom_smooth() +
+  geom_point(alpha = 0.1) +
+  geom_smooth(se = FALSE) +
   scale_x_continuous(
     breaks = c(0, 500, 1000, 1500),
     ) +
-  facet_grid(. ~ education)
+  facet_grid(. ~ education) +
+  labs(
+    x = 'Minutes of a day',
+    y = 'Mean activity over a day',
+    title = '24-hour activity across sex and education'
+  )
 ```
 
 * *comment*:
-  * for both sex, the mean activity will decrease from the start of a day until time goes to around 600 mins of a day. Then the mean activity will increase until time goes to around 1000 mins of a day. Then the mean activity will decrease till the end of day.
+  * for both sex, the mean activity will decrease from the start of a day until time goes to around 250 mins of a day. Then the mean activity will increase until time goes to around 750 mins of a day. Then the mean activity will decrease till the end of day.
   * for each education level, the lowest mean activity of a day is similar, while for the highest mean activity of a day, group less than high school will have more mean activity than other two groups.
-
-
-
-
-
+  * the distribution of mean activity over a day seems generally to be overlapped for both gender, while females are more likely to have a larger max mean activity over a day than males for high school equivalent education group and more than high school education group. for less than high school education group, females appear to have a lower min mean activity over a day than males.
 
