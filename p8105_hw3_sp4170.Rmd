@@ -306,7 +306,8 @@ final_df |>
   select(seqn, sex, age, education, sum_activity) |> 
   distinct(seqn, .keep_all = TRUE) |> 
   ggplot(aes(x = age, y = sum_activity, color = sex)) +
-  geom_smooth(se = FALSE) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(se = FALSE, alpha = 0.5) +
   facet_grid(. ~ education) +
   labs(
     title = 'Total activity over the day by sex and education',
